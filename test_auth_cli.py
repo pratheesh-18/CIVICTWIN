@@ -143,7 +143,17 @@ def run_auth_smoke_test():
             headers={"Authorization": f"Bearer {comm_token}"},
         ).json()
         assert len(comm_clusters) >= len(dept_clusters)
-        print(f" [PASS] TEST 6: Department vs Commissioner .... PASSED (Roads: {len(dept_clusters)}, Commissioner: {len(comm_clusters)})")
+
+        # Admin login also succeeds and has full commissioner access
+        admin_login = client.post(
+            "/api/auth/department/login",
+            json={"username": "admin", "password": "CivicAdmin@2026"},
+        )
+        assert admin_login.status_code == 200, f"Admin login failed: {admin_login.text}"
+        admin_data = admin_login.json()
+        assert admin_data["user"]["role"] == "commissioner"
+
+        print(f" [PASS] TEST 6: Department vs Commissioner/Admin PASSED (Roads: {len(dept_clusters)}, Commissioner/Admin: {len(comm_clusters)})")
         passed += 1
 
         # TEST 7: Citizen Forbidden from Work Order Verification

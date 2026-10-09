@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -229,14 +230,41 @@ def department_login(
     """
     Authenticates municipal department officers and commissioner using username & password.
     """
+    raw_username = req.username.strip().lower()
+
     user = (
         db.query(User)
         .filter(
-            User.username == req.username.strip(),
+            func.lower(User.username) == raw_username,
             User.role.in_(["department", "commissioner"]),
         )
         .first()
     )
+
+    # If user not found or password doesn't match, check against fallback demo accounts
+    if (not user or not verify_password(req.password, user.password_hash or "")) and req.password == settings.DEMO_DEPT_PASSWORD:
+        from app.db.init_db import DEFAULT_OFFICERS
+        match_info = next((o for o in DEFAULT_OFFICERS if o["username"].lower() == raw_username), None)
+        if match_info:
+            hashed_pwd = hash_password(settings.DEMO_DEPT_PASSWORD)
+            if not user:
+                user = User(
+                    name=match_info["name"],
+                    username=match_info["username"].lower(),
+                    role=match_info["role"],
+                    department=match_info["department"],
+                    password_hash=hashed_pwd,
+                    is_verified=True,
+                    created_at=datetime.utcnow(),
+                )
+                db.add(user)
+            else:
+                user.role = match_info["role"]
+                user.department = match_info["department"]
+                user.password_hash = hashed_pwd
+                user.is_verified = True
+            db.commit()
+            db.refresh(user)
 
     if not user or not verify_password(req.password, user.password_hash or ""):
         raise HTTPException(

@@ -34,7 +34,7 @@ export const translations = {
 
     // Department Login
     usernameLabel: "Department Username",
-    usernamePlaceholder: "e.g. roads_officer, commissioner",
+    usernamePlaceholder: "e.g. admin, commissioner, roads_officer",
     passwordLabel: "Password",
     passwordPlaceholder: "Enter password",
     departmentLoginBtn: "Sign in to Command Center",

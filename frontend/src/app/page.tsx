@@ -312,14 +312,14 @@ export default function LoginPage() {
               </button>
 
               <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 space-y-2">
-                <p className="font-semibold text-slate-700">Quick Fill Demo Officers:</p>
+                <p className="font-semibold text-slate-700">Quick Fill Demo Accounts:</p>
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
-                    onClick={() => fillDemoOfficer("roads_officer")}
-                    className="px-2 py-0.5 bg-white border border-slate-300 hover:border-emerald-600 hover:text-emerald-700 rounded font-mono"
+                    onClick={() => fillDemoOfficer("admin")}
+                    className="px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 hover:border-emerald-600 rounded font-mono font-semibold"
                   >
-                    roads_officer
+                    admin
                   </button>
                   <button
                     type="button"
@@ -330,6 +330,13 @@ export default function LoginPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => fillDemoOfficer("roads_officer")}
+                    className="px-2 py-0.5 bg-white border border-slate-300 hover:border-emerald-600 hover:text-emerald-700 rounded font-mono"
+                  >
+                    roads_officer
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => fillDemoOfficer("water_officer")}
                     className="px-2 py-0.5 bg-white border border-slate-300 hover:border-emerald-600 hover:text-emerald-700 rounded font-mono"
                   >
@@ -337,7 +344,7 @@ export default function LoginPage() {
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Password: <code className="bg-white px-1 py-0.5 rounded border border-slate-200">CivicAdmin@2026</code>
+                  Password: <code className="bg-white px-1 py-0.5 rounded border border-slate-200 font-semibold text-slate-700">CivicAdmin@2026</code>
                 </p>
               </div>
             </form>

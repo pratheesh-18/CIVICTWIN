@@ -5,16 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
-from app.db.session import engine, Base
+from app.db.session import engine, Base, SessionLocal
 import app.db.models  # Ensures all ORM models are registered with Base metadata
+from app.db.init_db import init_default_data
 from app.api.router import api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure upload directory exists and database tables are created
+    # Startup: ensure upload directory exists, database tables are created, and default users seeded
     os.makedirs("uploads", exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        init_default_data(db)
     yield
 
 
