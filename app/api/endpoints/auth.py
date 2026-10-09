@@ -12,7 +12,12 @@ from app.core.security import (
     create_access_token,
 )
 from app.core.otp import generate_and_store_otp, verify_stored_otp
-from app.core.auth import get_current_user, require_citizen
+from app.core.auth import (
+    get_current_user,
+    require_citizen,
+    set_auth_cookie,
+    clear_auth_cookie,
+)
 from app.db.session import get_db
 from app.db.models import User, Complaint, Cluster
 from app.schemas.auth import (
@@ -87,6 +92,7 @@ def register(
 def login_citizen(
     req: CitizenLoginRequest,
     response: Response,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -119,14 +125,7 @@ def login_citizen(
         }
     )
 
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    set_auth_cookie(response, token, request)
 
     return {
         "success": True,
@@ -172,6 +171,7 @@ def request_otp(
 def verify_otp(
     req: OtpVerifyRequest,
     response: Response,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -208,15 +208,8 @@ def verify_otp(
         }
     )
 
-    # Set HTTP-only Cookie
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=False,  # Set True in production over HTTPS
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    # Set session Cookie
+    set_auth_cookie(response, token, request)
 
     return {
         "success": True,
@@ -230,6 +223,7 @@ def verify_otp(
 def department_login(
     req: DepartmentLoginRequest,
     response: Response,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -260,14 +254,7 @@ def department_login(
         }
     )
 
-    response.set_cookie(
-        key=settings.SESSION_COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    set_auth_cookie(response, token, request)
 
     return {
         "success": True,
@@ -278,9 +265,9 @@ def department_login(
 
 
 @router.post("/logout")
-def logout(response: Response):
-    """Logs out by clearing the HTTP-only session cookie."""
-    response.delete_cookie(key=settings.SESSION_COOKIE_NAME)
+def logout(response: Response, request: Request):
+    """Logs out by clearing the session cookie."""
+    clear_auth_cookie(response, request)
     return {"success": True, "message": "Logged out successfully."}
 
 

@@ -2,7 +2,16 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User } from "../types";
-import { getMe, logoutUser, verifyOtp, loginDepartment, registerCitizen, loginCitizen } from "../lib/api";
+import {
+  getMe,
+  logoutUser,
+  verifyOtp,
+  loginDepartment,
+  registerCitizen,
+  loginCitizen,
+  setAuthToken,
+  clearAuthToken,
+} from "../lib/api";
 import { Language, translations } from "../lib/translations";
 import { useRouter } from "next/navigation";
 
@@ -62,12 +71,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       res = await loginCitizen(phone);
     }
+    if (res?.token) {
+      setAuthToken(res.token);
+    }
     setUser(res.user);
     return res.user;
   };
 
   const loginAsDepartment = async (username: string, password: string) => {
     const res = await loginDepartment(username, password);
+    if (res?.token) {
+      setAuthToken(res.token);
+    }
     setUser(res.user);
     return res.user;
   };
@@ -80,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await logoutUser();
     } finally {
+      clearAuthToken();
       setUser(null);
       router.push("/");
     }

@@ -28,6 +28,60 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+export const TOKEN_STORAGE_KEY = "civictwin_token";
+export const SESSION_COOKIE_NAME = "civictwin_session";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setAuthToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    const isSecure = window.location.protocol === "https:";
+    const secureFlag = isSecure ? "; Secure" : "";
+    document.cookie = `${SESSION_COOKIE_NAME}=${token}; path=/; max-age=604800; SameSite=Lax${secureFlag}`;
+  } else {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    document.cookie = `${SESSION_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  }
+}
+
+export function clearAuthToken(): void {
+  setAuthToken(null);
+}
+
+// Attach Authorization Bearer token to all outgoing requests
+api.interceptors.request.use(
+  (config) => {
+    const token = getAuthToken();
+    if (token) {
+      config.headers = config.headers || {};
+      if (!config.headers.Authorization) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor: on 401 on identity endpoints, clear stale credentials
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const url = error.config?.url || "";
+      if (url.includes("/me") || url.includes("/auth/me")) {
+        clearAuthToken();
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Fallback Mock Data for offline demo resiliency
 const MOCK_ANALYTICS: AnalyticsStats = {
   total_complaints: 38,
@@ -261,6 +315,9 @@ export async function registerCitizen(name: string, phone: string): Promise<{ su
 
 export async function loginCitizen(phone: string): Promise<{ success: boolean; user: User; token: string; message: string }> {
   const response = await api.post("/auth/citizen/login", { phone });
+  if (response.data?.token) {
+    setAuthToken(response.data.token);
+  }
   return response.data;
 }
 
@@ -271,30 +328,58 @@ export async function requestOtp(phone: string): Promise<{ success: boolean; pho
 
 export async function verifyOtp(phone: string, code: string): Promise<{ success: boolean; user: User; token: string }> {
   const response = await api.post("/auth/otp/verify", { phone, code });
+  if (response.data?.token) {
+    setAuthToken(response.data.token);
+  }
   return response.data;
 }
 
 export async function loginDepartment(username: string, password: string): Promise<{ success: boolean; user: User; token: string }> {
   const response = await api.post("/auth/department/login", { username, password });
+  if (response.data?.token) {
+    setAuthToken(response.data.token);
+  }
   return response.data;
 }
 
 export async function logoutUser(): Promise<{ success: boolean }> {
-  const response = await api.post("/auth/logout");
-  return response.data;
+  try {
+    const response = await api.post("/auth/logout");
+    return response.data;
+  } catch {
+    return { success: true };
+  } finally {
+    clearAuthToken();
+  }
 }
 
 export async function getMe(): Promise<User | null> {
+  const token = getAuthToken();
+  // If no token exists in storage, the user is unauthenticated.
+  // Return null gracefully without firing an unauthorized request.
+  if (!token) {
+    return null;
+  }
+
   try {
     const response = await api.get<User>("/auth/me");
     return response.data;
-  } catch (error) {
-    try {
-      const fallback = await api.get<User>("/me");
-      return fallback.data;
-    } catch {
+  } catch (error: any) {
+    if (error?.response?.status === 401) {
+      clearAuthToken();
       return null;
     }
+    // Only attempt legacy /me fallback if route was not found (404)
+    if (error?.response?.status === 404) {
+      try {
+        const fallback = await api.get<User>("/me");
+        return fallback.data;
+      } catch {
+        clearAuthToken();
+        return null;
+      }
+    }
+    return null;
   }
 }
 

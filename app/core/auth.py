@@ -1,5 +1,5 @@
 from typing import Optional, List, Callable
-from fastapi import Request, Depends, HTTPException, status
+from fastapi import Request, Response, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -10,10 +10,60 @@ from app.db.models import User
 
 def extract_token_from_request(request: Request) -> Optional[str]:
     """Extracts session token from Authorization header or HTTP-only cookie."""
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        return auth_header.split(" ", 1)[1]
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth_header:
+        parts = auth_header.strip().split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1]
+        elif len(parts) == 1:
+            return parts[0]
     return request.cookies.get(settings.SESSION_COOKIE_NAME)
+
+
+def set_auth_cookie(
+    response: Response,
+    token: str,
+    request: Optional[Request] = None,
+) -> None:
+    """Sets session cookie with cross-site SameSite=None and Secure=True in production/HTTPS."""
+    is_https = False
+    if request:
+        proto = request.headers.get("x-forwarded-proto", "").lower()
+        is_https = request.url.scheme == "https" or proto == "https"
+
+    samesite = "none" if is_https else "lax"
+    secure = is_https
+
+    response.set_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite=samesite,
+        secure=secure,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
+def clear_auth_cookie(
+    response: Response,
+    request: Optional[Request] = None,
+) -> None:
+    """Clears the session cookie matching SameSite/Secure flags."""
+    is_https = False
+    if request:
+        proto = request.headers.get("x-forwarded-proto", "").lower()
+        is_https = request.url.scheme == "https" or proto == "https"
+
+    samesite = "none" if is_https else "lax"
+    secure = is_https
+
+    response.delete_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        path="/",
+        samesite=samesite,
+        secure=secure,
+    )
 
 
 def get_current_user_optional(
