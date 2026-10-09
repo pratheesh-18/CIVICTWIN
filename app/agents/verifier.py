@@ -6,16 +6,24 @@ import re
 from typing import Optional, Dict, Any
 from PIL import Image
 
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    has_genai = True
+except ImportError:
+    genai = None
+    has_genai = False
+
 from app.core.config import settings
 
 # Configure Gemini API
 API_KEY = os.environ.get("GEMINI_API_KEY") or settings.GEMINI_API_KEY
-if API_KEY:
+if has_genai and API_KEY:
     try:
         genai.configure(api_key=API_KEY)
     except Exception as e:
         print(f"[AGENT 5] Warning: Failed to configure Gemini API: {e}")
+elif not has_genai:
+    print("[AGENT 5] Info: google-generativeai not installed; using structural visual analysis engine.")
 else:
     print("[AGENT 5] Info: GEMINI_API_KEY not configured. Verifier will utilize structural visual analysis.")
 
@@ -113,30 +121,31 @@ Respond strictly with valid JSON only in this exact format:
 }}
 """
 
-    models_to_try = [
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-    ]
+    if has_genai and API_KEY:
+        models_to_try = [
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
+        ]
 
-    for model_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content([prompt, img_before, img_after])
-            response_text = response.text.strip()
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content([prompt, img_before, img_after])
+                response_text = response.text.strip()
 
-            # Extract JSON block if wrapped in markdown
-            json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-            if json_match:
-                parsed = json.loads(json_match.group(0))
-                return {
-                    "is_problem_solved": bool(parsed.get("is_problem_solved", False)),
-                    "verdict": str(parsed.get("verdict", "REJECTED")).upper(),
-                    "reason": str(parsed.get("reason", "Multimodal visual audit executed.")),
-                }
-        except Exception as e:
-            # Continue to next model if quota or unavailable
-            continue
+                # Extract JSON block if wrapped in markdown
+                json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group(0))
+                    return {
+                        "is_problem_solved": bool(parsed.get("is_problem_solved", False)),
+                        "verdict": str(parsed.get("verdict", "REJECTED")).upper(),
+                        "reason": str(parsed.get("reason", "Multimodal visual audit executed.")),
+                    }
+            except Exception as e:
+                # Continue to next model if quota or unavailable
+                continue
 
     # Deterministic fallback if API quota temporary limit occurs:
     # Check pixel entropy to ensure image is not pitch black / blank / occluded

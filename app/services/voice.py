@@ -3,7 +3,13 @@ import logging
 import os
 import re
 from typing import Any, Dict, Optional, Tuple
-from groq import Groq
+try:
+    from groq import Groq
+    has_groq = True
+except ImportError:
+    Groq = None
+    has_groq = False
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -18,6 +24,9 @@ def transcribe_audio_with_groq(
     Transcribes spoken voice audio (Tamil, Tanglish, English) using Groq Whisper.
     Supports explicit language hinting ('ta' for Tamil, 'en' for English) or autodetect.
     """
+    if not has_groq or Groq is None:
+        raise ValueError("The 'groq' package is not installed. Please install groq via requirements.txt.")
+
     api_key = settings.GROQ_API_KEY
     if not api_key:
         raise ValueError("GROQ_API_KEY is not configured.")
